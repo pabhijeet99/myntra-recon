@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Myntra Reconciliation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #1a1d24;
+    --border: #2a2d36;
+    --accent: #ff6b35;
+    --accent2: #ffd166;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --success: #4ade80;
+    --danger: #f87171;
+    --info: #60a5fa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 13px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+    gap: 12px;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--accent); }
+  .logo .ver {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 400;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: 4px;
+  }
+  .header-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* LAYOUT */
+  .app { display: flex; height: calc(100vh - 57px); }
+
+  /* SIDEBAR TOGGLE BUTTON */
+  .sidebar-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .sidebar-toggle:hover { color: var(--text); border-color: var(--accent); background: rgba(255,107,53,0.08); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border-right: none;
+  }
+  .sidebar-header {
+    padding: 16px 20px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* UPLOAD CARDS */
+  .upload-card {
+    margin: 8px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+    position: relative;
+  }
+  .upload-card:hover { border-color: var(--accent); background: rgba(255,107,53,0.05); }
+  .upload-card.loaded {
+    border-style: solid; border-color: var(--success);
+    background: rgba(74,222,128,0.04);
+    box-shadow: 0 0 0 1px rgba(74,222,128,0.1) inset;
+  }
+  .upload-card.drag-over {
+    border-color: var(--accent); border-style: solid;
+    background: rgba(255,107,53,0.1);
+    box-shadow: 0 0 0 2px rgba(255,107,53,0.2) inset;
+  }
+  .upload-card input[type=file] { display: none; }
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .card-name { font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .card-status {
+    position: absolute; top: 10px; right: 10px;
+    font-size: 14px;
+  }
+  .card-files {
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-hint {
+    font-size: 9.5px;
+    color: rgba(255,107,53,0.7);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-actions {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #e05a27; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* PROGRESS */
+  .progress-wrap { padding: 10px 12px; }
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .progress-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* MAIN AREA */
+  .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .toolbar-group { display: flex; align-items: center; gap: 6px; }
+  .toolbar label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
+  }
+  .toolbar input, .toolbar select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    outline: none;
+  }
+  .toolbar input[type=date] { color-scheme: dark; }
+  .toolbar input:focus, .toolbar select:focus { border-color: var(--accent); }
+  .btn-clear {
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .btn-clear:hover { color: var(--text); border-color: var(--muted); }
+
+  .stats-row {
+    display: flex;
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .stat-chip {
+    flex: 1;
+    background: var(--surface);
+    padding: 9px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border-top: 2px solid transparent;
+    transition: background 0.15s;
+    cursor: default;
+  }
+  .stat-chip:hover { background: rgba(26,29,36,0.8); }
+  .stat-chip:nth-child(1) { border-top-color: var(--accent); }
+  .stat-chip:nth-child(2) { border-top-color: var(--success); }
+  .stat-chip:nth-child(3) { border-top-color: var(--danger); }
+  .stat-chip:nth-child(4) { border-top-color: var(--accent2); }
+  .stat-chip:nth-child(5) { border-top-color: var(--accent); }
+  .stat-chip:nth-child(6) { border-top-color: var(--success); }
+  .stat-chip:nth-child(7) { border-top-color: var(--info); }
+  .stat-chip .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .stat-chip .lbl {
+    font-size: 9.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+  }
+  .val.orange { color: var(--accent); }
+  .val.green  { color: var(--success); }
+  .val.red    { color: var(--danger); }
+  .val.yellow { color: var(--accent2); }
+
+  /* TABLE */
+  .table-wrap {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+    font-size: 11px;
+  }
+
+  thead th {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--surface2);
+    padding: 8px 12px;
+    text-align: left;
+    white-space: nowrap;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s, background 0.15s;
+  }
+  thead th:hover { color: var(--text); background: rgba(42,45,54,0.8); }
+  /* Active sort column */
+  thead th.sort-asc,
+  thead th.sort-desc { color: var(--accent); background: rgba(255,107,53,0.08); }
+  thead th.sort-asc::after  { content: ' ↑'; font-size: 10px; }
+  thead th.sort-desc::after { content: ' ↓'; font-size: 10px; }
+  thead th .col-letter {
+    display: block;
+    font-size: 8px;
+    color: var(--accent);
+    opacity: 0.7;
+    margin-bottom: 2px;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(42,45,54,0.4);
+    transition: background 0.08s;
+  }
+  tbody tr:nth-child(even) { background: rgba(17,19,24,0.6); }
+  tbody tr:hover { background: rgba(42,45,54,0.6) !important; }
+
+  td {
+    padding: 6px 12px;
+    white-space: nowrap;
+    border-right: 1px solid rgba(42,45,54,0.25);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  td.num { text-align: right; color: var(--text); }
+
+  /* STATUS BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .badge-done    { background: rgba(74,222,128,0.12);  color: var(--success); border: 1px solid rgba(74,222,128,0.25); }
+  .badge-pending { background: rgba(251,191,36,0.12);  color: var(--accent2); border: 1px solid rgba(251,191,36,0.25); }
+  .badge-ticket  { background: rgba(248,113,113,0.12); color: var(--danger);  border: 1px solid rgba(248,113,113,0.25); }
+  .badge-info    { background: rgba(96,165,250,0.12);  color: var(--info);    border: 1px solid rgba(96,165,250,0.25); }
+  .badge-claim   { background: rgba(255,107,53,0.12);  color: var(--accent);  border: 1px solid rgba(255,107,53,0.25); }
+  .badge-gray    { background: rgba(107,114,128,0.12); color: var(--muted);   border: 1px solid rgba(107,114,128,0.25); }
+
+  /* EMPTY / LOADING */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-title { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
+  .empty-sub { font-size: 12px; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    max-width: 360px;
+    z-index: 999;
+    transition: opacity 0.3s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.error { border-left-color: var(--danger); }
+  #toast.success { border-left-color: var(--success); }
+
+  /* PAGINATION */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .page-btns { display: flex; gap: 3px; }
+  .page-btn {
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+  .page-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  /* DIFF COLORING */
+  .diff-pos { color: var(--success); }
+  .diff-neg { color: var(--danger); }
+  .diff-zero { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+    <div class="logo">MYNTRA <span>RECON</span><span class="ver">v6</span></div>
+  </div>
+  <div class="header-meta" id="headerMeta">0 / 6 sheets loaded</div>
+</header>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">Upload Sheets — drag &amp; drop supported</div>
+
+    <!-- 1. Uniware -->
+    <div class="upload-card" id="card-uni" onclick="document.getElementById('file-uni').click()">
+      <input type="file" id="file-uni" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('uni', this)">
+      <div class="card-label">Sheet 1</div>
+      <div class="card-name">Uniware</div>
+      <div class="card-hint">Multi-file · filtered by selected platform</div>
+      <div class="card-status" id="status-uni">⬜</div>
+      <div class="card-files" id="files-uni"></div>
+    </div>
+
+    <!-- 2. Sales Register -->
+    <div class="upload-card" id="card-sr" onclick="document.getElementById('file-sr').click()">
+      <input type="file" id="file-sr" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('sr', this)">
+      <div class="card-label">Sheet 2</div>
+      <div class="card-name">Sales Register</div>
+      <div class="card-hint">Multi-file supported</div>
+      <div class="card-status" id="status-sr">⬜</div>
+      <div class="card-files" id="files-sr"></div>
+    </div>
+
+    <!-- 3. Sales Return Register -->
+    <div class="upload-card" id="card-srr" onclick="document.getElementById('file-srr').click()">
+      <input type="file" id="file-srr" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('srr', this)">
+      <div class="card-label">Sheet 3</div>
+      <div class="card-name">Sales Return Register</div>
+      <div class="card-hint">SR Number &amp; SR Value ← Invoice Code</div>
+      <div class="card-status" id="status-srr">⬜</div>
+      <div class="card-files" id="files-srr"></div>
+    </div>
+
+    <!-- 4. Myntra Order Report -->
+    <div class="upload-card" id="card-mor" onclick="document.getElementById('file-mor').click()">
+      <input type="file" id="file-mor" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('mor', this)">
+      <div class="card-label">Sheet 4</div>
+      <div class="card-name">Myntra Order Report</div>
+      <div class="card-hint">Multi-file supported</div>
+      <div class="card-status" id="status-mor">⬜</div>
+      <div class="card-files" id="files-mor"></div>
+    </div>
+
+    <!-- 5. Myntra Return Report -->
+    <div class="upload-card" id="card-mrr" onclick="document.getElementById('file-mrr').click()">
+      <input type="file" id="file-mrr" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('mrr', this)">
+      <div class="card-label">Sheet 5</div>
+      <div class="card-name">Myntra Return Report</div>
+      <div class="card-hint">Status &amp; SR mapped here</div>
+      <div class="card-status" id="status-mrr">⬜</div>
+      <div class="card-files" id="files-mrr"></div>
+    </div>
+
+    <!-- 6. Payment -->
+    <div class="upload-card" id="card-pay" onclick="document.getElementById('file-pay').click()">
+      <input type="file" id="file-pay" multiple accept=".xlsx,.xls,.csv" onchange="loadSheet('pay', this)">
+      <div class="card-label">Sheet 6</div>
+      <div class="card-name">Payment Sheet</div>
+      <div class="card-hint">Multi-file append · upload ALL months for full coverage</div>
+      <div class="card-status" id="status-pay">⬜</div>
+      <div class="card-files" id="files-pay"></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText">0 of 6 sheets loaded</div>
+    </div>
+
+    <!-- PLATFORM SELECTOR -->
+    <div style="padding:8px 12px 4px; border-top:1px solid var(--border);">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Platform</div>
+      <select id="platformSelect" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;cursor:pointer;">
+        <option value="MYNTRA">Myntra</option>
+        <option value="AMAZON">Amazon</option>
+        <option value="AJIO">AJIO</option>
+        <option value="FLIPKART">Flipkart</option>
+        <option value="TATACLIQ">TataCliq</option>
+        <option value="ETERNZ">Eternz</option>
+        <option value="SHOPIFY">Shopify</option>
+        <option value="ALL">All Platforms</option>
+      </select>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="btn btn-primary" id="runBtn" onclick="runRecon()" disabled>▶ Run Reconciliation</button>
+      <button class="btn btn-secondary" id="exportBtn" onclick="exportExcel()" disabled>↓ Export Filtered Excel</button>
+      <button class="btn btn-secondary" onclick="resetAll()">⟳ Reset All</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <label>Search</label>
+        <input type="text" id="searchInput" placeholder="Order code, invoice, status…" oninput="applyFilters()" style="width:190px">
+      </div>
+      <div class="toolbar-group">
+        <label>Status</label>
+        <select id="statusFilter" onchange="applyFilters()">
+          <option value="">All Statuses</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label>From</label>
+        <input type="date" id="dateFrom" oninput="applyFilters()" style="width:138px">
+      </div>
+      <div class="toolbar-group">
+        <label>To</label>
+        <input type="date" id="dateTo" oninput="applyFilters()" style="width:138px">
+      </div>
+      <button class="btn-clear" onclick="clearFilters()">✕ Clear</button>
+      <div class="toolbar-group" style="margin-left:auto">
+        <label>Rows/page</label>
+        <select id="pageSizeSelect" onchange="changePageSize()">
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-chip">
+        <span class="val orange" id="statTotal">0</span>
+        <span class="lbl" id="statTotalLbl">Total Orders</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val green" id="statDone">0</span>
+        <span class="lbl">Done</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val red" id="statTicket">0</span>
+        <span class="lbl">Ticket Needed</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val yellow" id="statPending">0</span>
+        <span class="lbl">Pending</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val orange" id="statBillVal">₹0</span>
+        <span class="lbl">Total Bill Value</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val green" id="statPayment">₹0</span>
+        <span class="lbl">Total Payment</span>
+      </div>
+      <div class="stat-chip">
+        <span class="val" id="statDiff">₹0</span>
+        <span class="lbl">Net Difference</span>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap" id="tableWrap">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">No Data Yet</div>
+        <div class="empty-sub">Upload your sheets and click Run Reconciliation</div>
+      </div>
+      <table id="reconTable" style="display:none">
+        <thead>
+          <tr>
+            <th onclick="sortBy('idx')" data-key="idx">#</th>
+            <th onclick="sortBy('display_order_code')" data-key="display_order_code"><span class="col-letter">A</span>Display Order Code</th>
+            <th onclick="sortBy('invoice_code')" data-key="invoice_code"><span class="col-letter">B</span>Invoice Code</th>
+            <th onclick="sortBy('total_price')" data-key="total_price"><span class="col-letter">C</span>Total Price</th>
+            <th onclick="sortBy('order_date')" data-key="order_date"><span class="col-letter">D</span>Order Date</th>
+            <th onclick="sortBy('sales_order_status')" data-key="sales_order_status"><span class="col-letter">E</span>SO Status</th>
+            <th onclick="sortBy('facility')" data-key="facility"><span class="col-letter">F</span>Facility</th>
+            <th onclick="sortBy('order_release_id')" data-key="order_release_id"><span class="col-letter">G</span>Order Release ID</th>
+            <th onclick="sortBy('return_status')" data-key="return_status"><span class="col-letter">H</span>Return Status</th>
+            <th onclick="sortBy('bill_no')" data-key="bill_no"><span class="col-letter">I</span>Bill No</th>
+            <th onclick="sortBy('bill_value')" data-key="bill_value"><span class="col-letter">J</span>Bill Value</th>
+            <th onclick="sortBy('sr_number')" data-key="sr_number"><span class="col-letter">K</span>SR Number</th>
+            <th onclick="sortBy('sr_value')" data-key="sr_value"><span class="col-letter">L</span>SR Value</th>
+            <th onclick="sortBy('fwd_payment')" data-key="fwd_payment"><span class="col-letter">M</span>Payment</th>
+            <th onclick="sortBy('payment_diff')" data-key="payment_diff"><span class="col-letter">N</span>Payment Diff</th>
+            <th onclick="sortBy('days_order')" data-key="days_order"><span class="col-letter">S</span>Days (Order)</th>
+            <th onclick="sortBy('days_ret_created')" data-key="days_ret_created"><span class="col-letter">T</span>Days (Ret)</th>
+            <th onclick="sortBy('days_ret_delivered')" data-key="days_ret_delivered"><span class="col-letter">U</span>Days (Ret Del)</th>
+            <th onclick="sortBy('period')" data-key="period"><span class="col-letter">D</span>Period</th>
+            <th onclick="sortBy('status')" data-key="status"><span class="col-letter">V</span>Status</th>
+          </tr>
+        </thead>
+        <tbody id="reconBody"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination" style="display:none">
+      <span id="pageInfo">Showing 0–0 of 0</span>
+      <div class="page-btns" id="pageBtns"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const sheets = { uni:[], sr:[], srr:[], mor:[], mrr:[], pay:[] };
+const loadedFlags = { uni:false, sr:false, srr:false, mor:false, mrr:false, pay:false };
+
+let reconData = [];
+let filteredData = [];
+let sortKey = null;
+let sortDir = 1;
+let currentPage = 1;
+let pageSize = 100;
+
+// ============================================================
+// DATE UTILITIES
+// ============================================================
+function parseDate(val) {
+  if (!val && val !== 0) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  // Excel serial number (e.g. 45000)
+  if (typeof val === 'number' && val > 0) {
+    const d = new Date((val - 25569) * 86400000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(val).trim();
+  if (!s) return null;
+  // Try ISO / standard parse
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+  const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    const [, dd, mm, yy] = m;
+    const yyyy = yy.length === 2 ? '20' + yy : yy;
+    d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function daysSince(date) {
+  if (!date) return 0;
+  return Math.floor((Date.now() - date.getTime()) / 86400000);
+}
+
+function formatDate(val) {
+  const d = (val instanceof Date) ? val : parseDate(val);
+  if (!d) return String(val || '');
+  return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+}
+
+function getDateVal(row, candidates) {
+  const col = findCol(row, candidates);
+  if (!col) return null;
+  return parseDate(row[col]);
+}
+
+// ============================================================
+// COLUMN PRE-DETECTION — detect column names ONCE per sheet,
+// then use fast direct-key accessors for every row.
+// This removes the O(rows × fields × candidates) bottleneck.
+// ============================================================
+function detectCols(rows, colDefs) {
+  if (!rows.length) return Object.fromEntries(Object.entries(colDefs).map(([k]) => [k, null]));
+  const firstRow = rows[0];
+  return Object.fromEntries(
+    Object.entries(colDefs).map(([field, candidates]) => [field, findCol(firstRow, candidates)])
+  );
+}
+// Fast value accessor (uses pre-detected column key)
+function fv(row, col) {
+  if (!col) return '';
+  const v = row[col];
+  if (v instanceof Date) return formatDate(v);
+  return String(v || '').trim();
+}
+// Fast numeric accessor
+function fn(row, col) {
+  if (!col) return 0;
+  const v = row[col];
+  if (typeof v === 'number') return v;
+  const n = parseFloat(String(v).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+// Fast date accessor
+function fd(row, col) {
+  if (!col) return null;
+  return parseDate(row[col]);
+}
+
+// ============================================================
+// SHEET LOADING
+// ============================================================
+function loadSheet(key, input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  loadSheetFromFiles(key, files);
+}
+
+// ── API endpoint — change this if your server runs on a different port ──
+const API_BASE = '';  // empty = same origin, works on Railway and localhost
+
+// Column definitions mirror server.js TABLE_COLS + detectCols candidates.
+// The frontend normalizes raw Excel rows into these fixed keys before
+// sending to the API so the server always receives clean, predictable JSON.
+const SHEET_COL_DEFS = {
+  uni: {
+    invoice_code:       ['Invoice Code','InvoiceCode','invoice_code','Invoice No','Invoice Number'],
+    display_order_code: ['Display Order Code','display_order_code','DisplayOrderCode','Order Code','order_code','Order No'],
+    total_price:        ['Total Price','total_price','TotalPrice','Total Amount','Amount','Order Amount'],
+    order_date:         ['Order Date','order_date','OrderDate','Sale Order Created At','Created At','Created Date','Date'],
+    sales_order_status: ['Sale Order Status','Sales Order Status','sale_order_status','sales_order_status','SalesOrderStatus','Sale Order State','Order Status','Status'],
+    facility:           ['Facility','facility','Warehouse','warehouse','Location','Store'],
+    channel_name:       ['Channel Name','channel_name','ChannelName','Channel','Marketplace','Platform','Source'],
+  },
+  mor: {
+    seller_order_id:  ['Seller Order ID','seller order id','seller_order_id','SellerOrderId','Order ID','order id'],
+    order_release_id: ['Order Release ID','order_release_id','orderreleaseid','order release id','Order Id','OrderId'],
+    status:           ['Order Status','status','Status','Order State','order state'],
+  },
+  mrr: {
+    order_release_id:      ['Order Release ID','order_release_id','orderreleaseid','Order Release Id'],
+    order_id:              ['Order ID','order_id','orderid','Order Id'],
+    seller_order_id:       ['seller_order_id','Seller Order ID','seller order id','SellerOrderId'],
+    status:                ['status','Status','Return Status','Delivery Status','delivery status','Return State'],
+    invoice_code:          ['Invoice Code','InvoiceCode','invoice_code','Invoice No'],
+    sr_number:             ['SR Number','SR No','sr_number','SR Ref No','Credit Note Number'],
+    sr_value:              ['SR Value','sr_value','Credit Note Value','Credit Note Amount','SR Amount','Amount'],
+    return_date:           ['return_created_date','Return Created Date','Return Date','order_rto_date','Return Initiated Date','Created At','Created Date','Date'],
+    return_delivered_date: ['lmdo_last_modified_on','lmdo last modified on','Return Delivered Date','Delivered Date','Delivery Date','delivered_date','return_delivered_date','Return Delivery Date'],
+    sr_date:               ['SR Date','Credit Note Date','Credit Note Created Date'],
+  },
+  sr: {
+    po_number:  ['PO Number','PONumber','po_number','PONO','PO No','PO','Buyer PO','Order No','Order Number','Order Reference','Order Ref','Ref No','Reference No','Document No'],
+    bill_no:    ['GST_BillNo','GST Bill No','GST BillNo','GST Bill Number','Bill No','Bill Number','BillNo','Invoice No','Invoice Number','Invoice','Bill'],
+    bill_date:  ['Bill Date','Bill Dt.','Bill Dt','BillDate','bill_date','Invoice Date','InvoiceDate','Date'],
+    bill_value: ['Bill Value','Bill Amount','BillValue','Bill Amt','BillAmt','bill_amt','Taxable Value','Invoice Value','Invoice Amount','Amount','Net Amount','Total Amount'],
+  },
+  srr: {
+    po_number:    ['PO Number','PONumber','po_number','PO No','PO','Buyer PO','Order No'],
+    bill_no_key:  ['GST BillNo','GST_BillNo','GST Bill No','GST Bill Number'],
+    invoice_code: ['Invoice Code','InvoiceCode','invoice_code','KFJ Invoice','KFJInvoice','Invoice No','Invoice Number','Invoice','Reference Invoice'],
+    sr_number:    ['Bill No','Bill Number','BillNo','BillNumber','SR Number','SR No','sr_number','Transaction Reference Number','Tran. RefNo','SR Ref No','Credit Note Number','Credit Note No'],
+    sr_value:     ['Bill Amount','SR Value','sr_value','Credit Note Value','Credit Note Amount','SR Amount','Amount','Net Amount'],
+    sr_date:      ['Bill Dt.','Bill Date','Bill Dt','SR Date','Credit Note Date','Credit Note Created Date','Date'],
+  },
+  pay: {
+    seller_order_id:      ['Seller Order ID','seller order id','seller_order_id','SellerOrderId','Order ID','order id'],
+    order_release_id:     ['Order Release ID','order_release_id','orderreleaseid','Order Release Id','Order Id'],
+    final_payment:        ['Final','FinalPayment','Final Payment','final_payment','NetPayment','Net Payment','net_payment'],
+    order_type:           ['Order_Type','Order Type','order_type','Payment_Type','Payment Type','payment_type','Transaction Type','transaction_type','Type'],
+    customer_paid_amt:    ['customer_paid_amt','Customer Paid Amt','customer paid amt','CustomerPaidAmt','customer_paid','paid_amount'],
+    commission:           ['Commission','commission'],
+    igst_tcs:             ['IGST_TCS','IGST TCS','igst_tcs'],
+    cgst_tcs:             ['CGST_TCS','CGST TCS','cgst_tcs'],
+    sgst_tcs:             ['SGST_TCS','SGST TCS','sgst_tcs'],
+    tds:                  ['TDS','tds'],
+    logistics_commission: ['Logistics_Commission','Logistics Commission','logistics_commission','LogisticsCommission','Logistics Fee'],
+    settled:              ['Settled_Amount','Settled Amount','settled_amount','Settlement Amount','settlementamount','Amount Settled'],
+    marketing_charges:    ['marketingCharges','marketing_charges','Marketing Charges','Marketing Fee','MarketingCharges'],
+  },
+};
+
+// Normalize raw Excel rows into fixed-key objects for the API
+function normalizeRows(key, rawRows) {
+  const colDefs = SHEET_COL_DEFS[key];
+  if (!colDefs || !rawRows.length) return [];
+  // Pre-detect actual column names from the first row
+  const colMap = detectCols(rawRows, colDefs);
+  return rawRows.map(row => {
+    const out = {};
+    for (const [field, actualCol] of Object.entries(colMap)) {
+      if (!actualCol) { out[field] = null; continue; }
+      const v = row[actualCol];
+      if (v instanceof Date) { out[field] = formatDate(v); continue; }
+      const s = String(v ?? '').trim();
+      out[field] = s === '' ? null : s;
+    }
+    return out;
+  });
+}
+
+// Push normalized rows to the API, return summary string
+async function syncToDb(key, normalizedRows) {
+  try {
+    const resp = await fetch(`${API_BASE}/sync/${key}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ rows: normalizedRows }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || resp.statusText);
+    }
+    const { inserted, updated, skipped } = await resp.json();
+    return `inserted ${inserted}, updated ${updated}, skipped ${skipped}`;
+  } catch (e) {
+    throw new Error(`DB sync failed: ${e.message}`);
+  }
+}
+
+function loadSheetFromFiles(key, files) {
+  showToast(`Loading ${files.length} file(s) for ${key.toUpperCase()}…`);
+  Promise.all(files.map(readFile)).then(async results => {
+    const combined = results.flat();
+    sheets[key] = combined;
+    loadedFlags[key] = combined.length > 0;
+    updateCard(key, files, combined.length);
+    updateProgress();
+    showToast(`✓ ${combined.length} rows loaded — syncing to DB…`);
+
+    // Normalize + push to DB
+    try {
+      const normalized = normalizeRows(key, combined);
+      const summary    = await syncToDb(key, normalized);
+      showToast(`✓ ${key.toUpperCase()} synced — ${summary}`, 'success');
+    } catch (e) {
+      showToast(`⚠ ${key.toUpperCase()} load OK but DB sync failed: ${e.message}`, 'error');
+      console.error('[DB sync]', e);
+    }
+  }).catch(e => showToast('Error: ' + e.message, 'error'));
+}
+
+function readFile(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        // Use the sheet with the most data rows (handles files where data isn't on sheet 1)
+        let best = [];
+        for (const name of wb.SheetNames) {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' });
+          if (rows.length > best.length) best = rows;
+        }
+        res(best);
+      } catch(err) { rej(err); }
+    };
+    reader.onerror = () => rej(new Error('File read error'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function updateCard(key, files, rowCount) {
+  document.getElementById('card-' + key).classList.add('loaded');
+  document.getElementById('status-' + key).textContent = '✅';
+  document.getElementById('files-' + key).textContent = files.map(f => f.name).join(', ') + ` (${rowCount} rows)`;
+}
+
+function updateProgress() {
+  const loaded = Object.values(loadedFlags).filter(Boolean).length;
+  const pct = (loaded / 6) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${loaded} of 6 sheets loaded`;
+  document.getElementById('headerMeta').textContent = `${loaded} / 6 sheets loaded`;
+  document.getElementById('runBtn').disabled = loaded < 1;
+}
+
+// ============================================================
+// DRAG & DROP
+// ============================================================
+const CARD_KEYS = {
+  'card-uni':'uni', 'card-sr':'sr', 'card-srr':'srr',
+  'card-mor':'mor', 'card-mrr':'mrr', 'card-pay':'pay'
+};
+
+Object.entries(CARD_KEYS).forEach(([cardId, key]) => {
+  const card = document.getElementById(cardId);
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', e => { if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over'); });
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+    if (files.length) loadSheetFromFiles(key, files);
+    else showToast('Drop .xlsx / .xls / .csv files only', 'error');
+  });
+});
+
+// ============================================================
+// HELPERS: COLUMN NAME NORMALIZATION
+// ============================================================
+function norm(str) {
+  return String(str || '').trim().toLowerCase().replace(/[\s_\-\/\.]+/g, '');
+}
+// normOri: for large numeric IDs (order_release_id).
+// Uses parseFloat→Math.round so text-formatted cells like '8679812991.0'
+// produce '8679812991' (same as integer cells) instead of '86798129910'
+// (which norm() would make by stripping the dot).
+function normOri(val) {
+  const s = String(val ?? '').trim();
+  const n = parseFloat(s);
+  return (s !== '' && !isNaN(n) && isFinite(n)) ? String(Math.round(n)) : norm(s);
+}
+
+function findCol(row, candidates) {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const nc = norm(c);
+    const found = keys.find(k => norm(k) === nc);
+    if (found !== undefined) return found;
+  }
+  // fuzzy: contains
+  for (const c of candidates) {
+    const nc = norm(c);
+    const found = keys.find(k => norm(k).includes(nc) || nc.includes(norm(k)));
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
+function getVal(row, candidates) {
+  const col = findCol(row, candidates);
+  if (col === null) return '';
+  const v = row[col];
+  // If xlsx parsed it as a Date object, format it
+  if (v instanceof Date) return formatDate(v);
+  return String(v || '').trim();
+}
+
+function getNum(row, candidates) {
+  const col = findCol(row, candidates);
+  if (col === null) return 0;
+  const v = row[col];
+  if (typeof v === 'number') return v;
+  const n = parseFloat(String(v).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function numVal(v) { const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n) ? 0 : n; }
+
+// ============================================================
+// HELPERS: MAPPING UTILS
+// ============================================================
+function lookupContains(map, target) {
+  const nt = norm(target);
+  if (!nt) return null;   // empty target must NOT fuzzy-match everything (k.includes('') is always true!)
+  if (map.has(nt)) return map.get(nt);
+  for (const [k, v] of map) {
+    if (!k) continue;   // skip empty keys
+    if (nt.includes(k) || k.includes(nt)) return v;
+  }
+  return null;
+}
+
+// ============================================================
+// SHOP GROUP DETECTION
+// Channel Name (primary) + Invoice Code pattern (fallback)
+// Matches the SQL CASE logic used in Sales Register
+// ============================================================
+function detectShopGroup(channelName, invoiceCode) {
+  const ch  = String(channelName  || '').toUpperCase().replace(/\s+/g, '');
+  const inv = String(invoiceCode  || '').toUpperCase().replace(/\s+/g, '');
+
+  if (ch.includes('MYNTRAPPMP') || ch.includes('MYNTRA'))  return 'MYNTRA';
+  if (ch.includes('AMAZON'))                               return 'AMAZON';
+  if (ch.includes('AJIO'))                                 return 'AJIO';
+  if (ch.includes('FLIPKART'))                             return 'FLIPKART';
+  if (ch.includes('TATACLIQ'))                             return 'TATACLIQ';
+  if (ch.includes('ETERNZ'))                               return 'ETERNZ';
+  if (ch.includes('SHOPIFY'))                              return 'SHOPIFY';
+
+  // Fallback: invoice code pattern
+  if (inv.startsWith('I') && inv.length >= 10)             return 'MYNTRA';
+  if (inv.startsWith('KFJ'))                               return 'SHOPIFY';
+  if (inv.startsWith('ETERNZ'))                            return 'ETERNZ';
+  if (inv.includes('AJIO'))                                return 'AJIO';
+  if (inv.includes('AMAZON'))                              return 'AMAZON';
+  if (inv.includes('FLIPKART'))                            return 'FLIPKART';
+  if (inv.includes('TATACLIQ'))                            return 'TATACLIQ';
+
+  return 'OTHER';
+}
+
+// ============================================================
+// RECONCILIATION ENGINE
+// ============================================================
+async function runRecon() {
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('reconTable').style.display = 'none';
+  document.getElementById('pagination').style.display = 'none';
+
+  // Show spinner + progress bar
+  const es = document.getElementById('emptyState');
+  es.style.display = 'flex';
+  es.innerHTML = `
+    <div class="spinner"></div>
+    <div class="empty-title" style="margin-top:10px">Processing…</div>
+    <div style="width:220px;background:var(--border);border-radius:2px;height:3px;margin-top:10px">
+      <div id="reconProgressBar" style="height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.15s"></div>
+    </div>
+    <div class="empty-sub" id="reconProgress" style="margin-top:6px">Building maps…</div>`;
+
+  // Yield so the spinner fully renders before heavy work starts
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const t0 = performance.now();
+    const result = await reconcile();           // ← now awaited; yields mid-loop
+    const ms = Math.round(performance.now() - t0);
+    reconData = result;
+    applyFilters();
+    populateStatusFilter();
+    updateStats();
+    es.style.display = 'none';
+    es.innerHTML = `<div class="empty-icon">📊</div>
+      <div class="empty-title">No Data Yet</div>
+      <div class="empty-sub">Upload your sheets and click Run Reconciliation</div>`;
+    document.getElementById('reconTable').style.display = '';
+    document.getElementById('pagination').style.display = 'flex';
+    document.getElementById('exportBtn').disabled = false;
+    showToast(`✓ ${result.length} orders reconciled in ${ms}ms`, 'success');
+  } catch(e) {
+    es.innerHTML = `<div class="empty-icon">⚠️</div>
+      <div class="empty-title">Error</div>
+      <div class="empty-sub">${esc(e.message)}</div>`;
+    showToast('Recon error: ' + e.message, 'error');
+    console.error(e);
+  }
+  document.getElementById('runBtn').disabled = false;
+}
+
+async function reconcile() {
+  // ── Pre-detect column names ONCE per sheet (not per row) ──────────────────
+  // Univare "Summary" export — first 6 cols of reference output come directly from this file:
+  // A=Display Order Code, B=Invoice Code, C=Total Price, D=Order Date,
+  // E=Sale Order Status (exact name in Univare), F=Facility
+  const uniC = detectCols(sheets.uni, {
+    invoice_code:       ['Invoice Code','InvoiceCode','invoice_code','Invoice No','Invoice Number'],
+    display_order_code: ['Display Order Code','display_order_code','DisplayOrderCode','Order Code','order_code','Order No'],
+    total_price:        ['Total Price','total_price','TotalPrice','Total Amount','Amount','Order Amount'],
+    order_date:         ['Order Date','order_date','OrderDate','Sale Order Created At','Created At','Created Date','Date'],
+    // 'Sale Order Status' (no trailing s) is the exact Univare column name — must be first candidate
+    sales_order_status: ['Sale Order Status','Sales Order Status','sale_order_status','sales_order_status','SalesOrderStatus','Sale Order State','Order Status','Status'],
+    facility:           ['Facility','facility','Warehouse','warehouse','Location','Store'],
+    channel_name:       ['Channel Name','channel_name','ChannelName','Channel','Marketplace','Platform','Source'],
+  });
+  const morC = detectCols(sheets.mor, {
+    seller_order_id:  ['Seller Order ID','seller order id','seller_order_id','SellerOrderId','Order ID','order id'],
+    order_release_id: ['Order Release ID','order_release_id','orderreleaseid','order release id','Order Id','OrderId'],
+    status:           ['Order Status','status','Status','Order State','order state'],
+  });
+  const mrrC = detectCols(sheets.mrr, {
+    order_release_id:  ['Order Release ID','order_release_id','orderreleaseid','Order Release Id'],
+    order_id:          ['Order ID','order_id','orderid','Order Id'],
+    seller_order_id:   ['seller_order_id','Seller Order ID','seller order id','SellerOrderId'],
+    // 'status' (col W) must come BEFORE 'Return Status' to avoid matching return_status column (which has "DLS")
+    status:            ['status','Status','Return Status','Delivery Status','delivery status','Return State'],
+    invoice_code:      ['Invoice Code','InvoiceCode','invoice_code','Invoice No'],
+    sr_number:         ['SR Number','SR No','sr_number','SR Ref No','Credit Note Number'],
+    sr_value:          ['SR Value','sr_value','Credit Note Value','Credit Note Amount','SR Amount','Amount'],
+    return_date:       ['return_created_date','Return Created Date','Return Date','order_rto_date','Return Initiated Date','Created At','Created Date','Date'],
+    // Return delivered date = lmdo_last_modified_on (col AI) per reference formula:
+    // =IF(AI="","",DAYS(TODAY(),AI)) where AI = lmdo_last_modified_on (LMDO = Last Mile Delivery Out)
+    return_delivered_date: ['lmdo_last_modified_on','lmdo last modified on','Return Delivered Date','Delivered Date','Delivery Date','delivered_date','return_delivered_date','Return Delivery Date'],
+    sr_date:           ['SR Date','Credit Note Date','Credit Note Created Date'],
+  });
+  const srC = detectCols(sheets.sr, {
+    // PO Number column in SR = the Myntra/platform invoice code (e.g. I3726KL000017037).
+    // Reference formula: VLOOKUP(B2, SR!G:J, 4) — B2=InvoiceCode, SR col G = PONO.
+    // "PONO." normalises to "pono" which matches "PO No" → "pono". Add wide fallbacks
+    // for SR files that use different column names for the buyer PO / invoice reference.
+    po_number:  ['PO Number','PONumber','po_number','PONO','PO No','PO',
+                 'Buyer PO','Buyer PO No','Buyer PO Number','Customer PO','Customer PO No',
+                 'Order No','Order Number','Order Reference','Order Ref',
+                 'Ref No','Ref Number','Reference No','Reference Number','Document No'],
+    bill_no:    ['GST_BillNo','GST Bill No','GST BillNo','GST Bill Number','Bill No','Bill Number','BillNo','Invoice No','Invoice Number','Invoice','Bill'],
+    bill_value: ['Bill Value','Bill Amount','BillValue','Bill Amt','BillAmt','bill_amt','Taxable Value','Taxable Amt','Invoice Value','Invoice Amount','Invoice Amt','Amount','Net Amount','Total Amount'],
+  });
+  const srrC = detectCols(sheets.srr, {
+    // Key 1: PO Number column (matches Uniware invoice_code — same logic as Sales Register)
+    po_number:    ['PO Number','PONumber','po_number','PO No','PO','Buyer PO','Order No'],
+    // Key 2: GST Bill No column in SRR — this is the LOOKUP KEY that matches SR's bill_no (GST_BillNo).
+    // Reference formula: =XLOOKUP(I2, 'Sales returns'!H:H, 'Sales returns'!B:B)
+    //   I2 = Bill No from SR = GST_BillNo value.  SRR!H = "GST BillNo" column.
+    bill_no_key:  ['GST BillNo','GST_BillNo','GST Bill No','GST Bill Number'],
+    // Key 3: Invoice column (matches Uniware invoice_code directly — KFJInvoice in SRR for Shopify/Myntra)
+    invoice_code: ['Invoice Code','InvoiceCode','invoice_code','KFJ Invoice','KFJInvoice','Invoice No','Invoice Number','Invoice','Reference Invoice'],
+    // SR # = "Bill No" column (SRR!B) — values like SR664, SR21891.
+    // Reference formula returns SRR column B which is the "Bill No" (SR serial number).
+    sr_number:    ['Bill No','Bill Number','BillNo','BillNumber','SR Number','SR No','sr_number','Transaction Reference Number','Tran. RefNo','SR Ref No','Credit Note Number','Credit Note No'],
+    sr_value:     ['Bill Amount','SR Value','sr_value','Credit Note Value','Credit Note Amount','SR Amount','Amount','Net Amount'],
+    sr_date:      ['Bill Dt.','Bill Date','Bill Dt','SR Date','Credit Note Date','Credit Note Created Date','Date'],
+  });
+  // Payment: uses FinalPayment column directly (pre-calculated net per row).
+  // Falls back to summing individual components if FinalPayment column not found.
+  // When 2+ payment files are uploaded they are already appended (results.flat()).
+  // This map aggregates (pivots) by order_release_id AND seller_order_id.
+  const payC = detectCols(sheets.pay, {
+    seller_order_id:      ['Seller Order ID','seller order id','seller_order_id','SellerOrderId','Order ID','order id'],
+    order_release_id:     ['Order Release ID','order_release_id','orderreleaseid','Order Release Id','Order Id'],
+    final_payment:        ['Final','FinalPayment','Final Payment','final_payment','NetPayment','Net Payment','net_payment'],
+    // Row-type column: used in fallback formula to distinguish Forward vs Reverse/NOD rows
+    order_type:           ['Order_Type','Order Type','order_type','Payment_Type','Payment Type','payment_type','Transaction Type','transaction_type','Type'],
+    // Fallback individual components (used only when FinalPayment column is absent)
+    // Forward  formula: comm + igst + cgst + sgst + tds + logistics + settled + marketing  (all +)
+    // Reverse  formula: -(comm + igst + cgst + sgst + tds - logistics - settled + marketing) × -1
+    //                  → logistics and settled FLIP SIGN vs forward before the ×-1
+    customer_paid_amt:    ['customer_paid_amt','Customer Paid Amt','customer paid amt','CustomerPaidAmt','customer_paid','paid_amount'],
+    commission:           ['Commission','commission'],
+    igst_tcs:             ['IGST_TCS','IGST TCS','igst_tcs'],
+    cgst_tcs:             ['CGST_TCS','CGST TCS','cgst_tcs'],
+    sgst_tcs:             ['SGST_TCS','SGST TCS','sgst_tcs'],
+    tds:                  ['TDS','tds'],
+    logistics_commission: ['Logistics_Commission','Logistics Commission','logistics_commission','LogisticsCommission','Logistics Fee'],
+    settled:              ['Settled_Amount','Settled Amount','settled_amount','Settlement Amount','settlementamount','Amount Settled'],
+    marketing_charges:    ['marketingCharges','marketing_charges','Marketing Charges','Marketing Fee','MarketingCharges'],
+  });
+
+  // ── 1. Uniware: filter rows by selected platform ──────────────────────────
+  const selPlatform = document.getElementById('platformSelect').value;
+  const uniRows = sheets.uni.filter(r => {
+    const inv = fv(r, uniC.invoice_code);
+    const ch  = fv(r, uniC.channel_name);
+    const sos = fv(r, uniC.sales_order_status).toUpperCase();
+    if (!inv && !ch && !sos) return false;
+    const sg = detectShopGroup(ch, inv);
+    if (selPlatform === 'ALL') return !!inv || !!ch;
+    if (selPlatform === 'MYNTRA') {
+      if (sg !== 'MYNTRA') return false;
+      // Include invoiced orders (I-prefix) AND cancelled orders (no invoice generated)
+      const hasInvoice = inv.toUpperCase().startsWith('I') && inv.length >= 10;
+      return hasInvoice || sos === 'CANCELLED';
+    }
+    return sg === selPlatform;
+  });
+
+  // ── 2. Myntra Order Report: seller_order_id → { ori, status } ────────────
+  const morBySOID = new Map();
+  for (const r of sheets.mor) {
+    const soid = norm(fv(r, morC.seller_order_id));
+    const ori  = normOri(fv(r, morC.order_release_id));  // normOri: handles float-string ORIs
+    const status = fv(r, morC.status);
+    if (soid) morBySOID.set(soid, { ori, status });
+  }
+
+  // ── 3. Myntra Return Report: ORI → { status, sr, dates } ─────────────────
+  const mrrByOri      = new Map();   // keyed by order_release_id (if present in MRR)
+  const mrrByOrderId  = new Map();   // keyed by order_id
+  const mrrBySOID     = new Map();   // keyed by seller_order_id (= display_order_code UUID) ← primary
+  const mrrSrByInvoice = new Map();
+  for (const r of sheets.mrr) {
+    const ori     = normOri(fv(r, mrrC.order_release_id));  // normOri: float-safe
+    const orderId = normOri(fv(r, mrrC.order_id));         // normOri: handles '8679812991.0' text cells
+    const soid    = norm(fv(r, mrrC.seller_order_id));
+    const status  = fv(r, mrrC.status);
+    const invCode = norm(fv(r, mrrC.invoice_code));
+    const srNum   = fv(r, mrrC.sr_number);
+    const srVal   = fn(r, mrrC.sr_value);
+    const returnDate          = fd(r, mrrC.return_date);
+    const returnDeliveredDate = fd(r, mrrC.return_delivered_date);
+    const srDate              = fd(r, mrrC.sr_date);
+    const entry = { status, sr_number: srNum, sr_value: srVal, return_date: returnDate, return_delivered_date: returnDeliveredDate, sr_date: srDate };
+    if (ori)     mrrByOri.set(ori, entry);
+    if (orderId) mrrByOrderId.set(orderId, entry);
+    if (soid)    mrrBySOID.set(soid, entry);            // ← seller_order_id = display_order_code
+    if (invCode) mrrSrByInvoice.set(invCode, { sr_number: srNum, sr_value: srVal, sr_date: srDate });
+  }
+
+  // ── 4. Sales Register: PO number → { bill_no, bill_value } ───────────────
+  // IMPORTANT: SUM bill_value per PONO — SR may have one row per line item.
+  // bill_no (GST bill number) is the same across all items of one invoice; keep first.
+  const srByPo = new Map();
+  for (const r of sheets.sr) {
+    const po  = norm(fv(r, srC.po_number));
+    if (!po) continue;
+    const existing = srByPo.get(po);
+    const newBillNo  = fv(r, srC.bill_no);
+    const newBillVal = fn(r, srC.bill_value);
+    if (existing) {
+      // Accumulate bill_value; keep the first non-empty bill_no
+      srByPo.set(po, {
+        bill_no:    existing.bill_no || newBillNo,
+        bill_value: existing.bill_value + newBillVal,
+      });
+    } else {
+      srByPo.set(po, { bill_no: newBillNo, bill_value: newBillVal });
+    }
+  }
+
+  // ── DIAGNOSTIC: log detected columns & map keys to browser console ────────
+  // Open F12 → Console after running to see this output.
+  // If srC.po_number is null or SR sample keys don't match your invoice codes,
+  // that's the cause of missing bill numbers.
+  console.group('%c[MYNTRA RECON] Diagnostics', 'color:#ff6b35;font-weight:bold');
+  console.log('UNI cols  →', { invoice_code: uniC.invoice_code, display_order_code: uniC.display_order_code, sales_order_status: uniC.sales_order_status, facility: uniC.facility });
+  console.log('SR  cols  →', { po_number: srC.po_number, bill_no: srC.bill_no, bill_value: srC.bill_value });
+  console.log('SRR cols  →', { bill_no_key: srrC.bill_no_key, sr_number: srrC.sr_number, sr_value: srrC.sr_value, po_number: srrC.po_number });
+  console.log('MOR cols  →', { seller_order_id: morC.seller_order_id, order_release_id: morC.order_release_id, status: morC.status });
+  console.log('MRR cols  →', { order_id: mrrC.order_id, order_release_id: mrrC.order_release_id, status: mrrC.status, return_delivered_date: mrrC.return_delivered_date });
+  console.log('PAY cols  →', { final_payment: payC.final_payment, order_release_id: payC.order_release_id, order_type: payC.order_type });
+  console.log(`Map sizes → SR:${srByPo.size}  MOR:${morBySOID.size}  MRR:${mrrByOrderId.size}`);
+  if (srByPo.size > 0) console.log('SR sample PO keys (first 8):', [...srByPo.keys()].slice(0, 8));
+  if (!srC.po_number)  console.warn('⚠️ SR po_number column NOT detected — bill lookup will FAIL for all orders! Check SR column names.');
+  if (!srC.bill_no)    console.warn('⚠️ SR bill_no (GST_BillNo) column NOT detected — bill numbers will be blank!');
+  if (!srC.bill_value) console.warn('⚠️ SR bill_value column NOT detected — bill values will be 0!');
+  if (!morC.seller_order_id) console.warn('⚠️ MOR seller_order_id NOT detected — Order Release IDs will be blank!');
+  console.groupEnd();
+  if (!srC.po_number) showToast('⚠️ SR: PO column not found — open F12 Console for details', 'error');
+
+  // ── 5. Sales Return Register ──────────────────────────────────────────────
+  // Three maps (same key strategy as Sales Register):
+  //  srrByPo      – keyed by PO Number      (matches Uniware invoice_code) ← primary
+  //  srrByBillNo  – keyed by Bill No        (matches SR's bill_no / GST bill)
+  //  srrByInvoice – keyed by Invoice / Code (matches Uniware invoice_code directly)
+  // IMPORTANT: SUM sr_value per key — SRR may have one row per returned line item.
+  const srrByPo      = new Map();
+  const srrByBillNo  = new Map();
+  const srrByInvoice = new Map();
+  function srrAccum(map, key, entry) {
+    if (!key) return;
+    const ex = map.get(key);
+    if (ex) {
+      map.set(key, {
+        sr_number: ex.sr_number || entry.sr_number,
+        sr_value:  ex.sr_value + entry.sr_value,
+        sr_date:   ex.sr_date  || entry.sr_date,
+      });
+    } else {
+      map.set(key, { ...entry });
+    }
+  }
+  for (const r of sheets.srr) {
+    const entry = {
+      sr_number: fv(r, srrC.sr_number),
+      sr_value:  fn(r, srrC.sr_value),
+      sr_date:   fd(r, srrC.sr_date),
+    };
+    srrAccum(srrByPo,      norm(fv(r, srrC.po_number)),    entry);
+    srrAccum(srrByBillNo,  norm(fv(r, srrC.bill_no_key)),  entry);
+    srrAccum(srrByInvoice, norm(fv(r, srrC.invoice_code)), entry);
+  }
+
+  // ── 6. Payment: pivot by ORI + Seller Order ID → NET (matches Sheet7 Sum of Final) ─
+  // Reference formula: N = XLOOKUP(G2, Sheet7!B:B, Sheet7!C:C)
+  //   G2 = order_release_id (ORI). Sheet7!B = order_release_id. Sheet7!C = Sum of Final (NET).
+  //   Sheet7 is a pivot: seller_order_id → order_release_id → SUM of ALL Final rows (forward + reverse).
+  //
+  // Payment 'Final' column formula (ALL rows, same formula): =ROUND(SUM(G+H+I+J+L+Q+R+AO),1)
+  //   = Commission + IGST_TCS + CGST_TCS + SGST_TCS + TDS + Logistics_Commission + Settled_Amount + marketingCharges
+  //   Forward rows: individual values are positive → Final is positive
+  //   Reverse rows: individual values are negative in source data → Final is negative naturally
+  //   NO special "reverse formula" needed — the sign comes from the data values themselves.
+  //
+  // We sum ALL rows (NET) — same as Sheet7 Sum of Final.
+  const payByOri  = new Map();
+  const payBySOID = new Map();
+  for (const r of sheets.pay) {
+    const ori  = normOri(fv(r, payC.order_release_id));  // normOri: '8679812991.0'→'8679812991'
+    const soid = norm(fv(r, payC.seller_order_id));
+
+    // Classify row: Reverse vs Forward/NOD (Forward and NOD use the same formula).
+    const orderType = payC.order_type ? fv(r, payC.order_type).toLowerCase() : '';
+    const isReverse = orderType !== '' &&
+      ['reverse', 'return', 'rto', 'rev'].some(t => orderType.includes(t));
+
+    // All component values taken as absolute (handles +/− storage conventions).
+    //
+    // Forward / NOD : |Comm|+|IGST|+|CGST|+|SGST|+|TDS| + |Logi| + |Settled| + |Mktg|
+    //                 → always positive → ADDED to running total
+    //
+    // Reverse       : |Comm|+|IGST|+|CGST|+|SGST|+|TDS| − |Logi| − |Settled| + |Mktg|
+    //                 → SUBTRACTED from running total
+    //                 → capped at MAX(0, …): if formula < 0, deduct nothing
+    //
+    // Example (all abs = 1):
+    //   Forward = 1+1+1+1+1+1 = 6   NOD = 6   Reverse = 1+1+1−1−1+1 = 2
+    //   Net = 6 + 6 − 2 = 10
+    const hasComponents = payC.commission || payC.igst_tcs || payC.settled || payC.logistics_commission;
+    let amount = 0;
+
+    if (payC.final_payment) {
+      // Pre-computed Final column present — take abs (reference Final = MAX(0, FinalPayment)).
+      amount = Math.round(Math.abs(fn(r, payC.final_payment)) * 10) / 10;
+    } else if (hasComponents) {
+      const comm = Math.abs(fn(r, payC.commission));
+      const igst = Math.abs(fn(r, payC.igst_tcs));
+      const cgst = Math.abs(fn(r, payC.cgst_tcs));
+      const sgst = Math.abs(fn(r, payC.sgst_tcs));
+      const tds  = Math.abs(fn(r, payC.tds));
+      const logi = Math.abs(fn(r, payC.logistics_commission));
+      const sett = Math.abs(fn(r, payC.settled));
+      const mktg = Math.abs(fn(r, payC.marketing_charges));
+
+      if (isReverse) {
+        // Reverse: comm+igst+cgst+sgst+tds − logi − settled + mktg
+        // Accumulated directly — negative when settled dominates (as expected).
+        // Net = Forward + NOD + reverseAmt  e.g. 1000 + 0 + (−1000) = 0
+        const reverseAmt = comm + igst + cgst + sgst + tds - logi - sett + mktg;
+        amount = Math.round(reverseAmt * 10) / 10;
+      } else {
+        // Forward / NOD: comm+igst+cgst+sgst+tds + logi + settled + mktg  → positive.
+        const forwardAmt = comm + igst + cgst + sgst + tds + logi + sett + mktg;
+        amount = Math.max(0, Math.round(forwardAmt * 10) / 10);
+      }
+    }
+
+    // Accumulate per ORI and per Seller Order ID.
+    // Forward/NOD → positive (adds).  Reverse → negative or 0 (deducts or neutral).
+    if (amount !== 0) {
+      if (ori)  payByOri.set(ori,   (payByOri.get(ori)   || 0) + amount);
+      if (soid) payBySOID.set(soid, (payBySOID.get(soid) || 0) + amount);
+    }
+  }
+
+  console.log(`PAY map sizes → ORI:${payByOri.size}  SOID:${payBySOID.size}`);
+
+  // ── BUILD OUTPUT — async with browser yields every CHUNK rows ────────────
+  const CHUNK = 400;   // rows processed per browser "tick"
+  const total = uniRows.length;
+  const out   = [];
+  let idx = 1;
+
+  for (let _i = 0; _i < total; _i++) {
+    const uRow = uniRows[_i];
+    const invoice_code       = fv(uRow, uniC.invoice_code);
+    const display_order_code = fv(uRow, uniC.display_order_code);
+    const total_price        = fn(uRow, uniC.total_price);
+    const order_date_parsed  = fd(uRow, uniC.order_date);
+    const order_date         = order_date_parsed ? formatDate(order_date_parsed) : fv(uRow, uniC.order_date);
+    const sales_order_status = fv(uRow, uniC.sales_order_status);
+    const facility           = fv(uRow, uniC.facility);
+    const shop_group         = detectShopGroup(fv(uRow, uniC.channel_name), invoice_code);
+
+    // G — Order Release ID (MOR lookup by display order code = seller order id)
+    const ndoc    = norm(display_order_code);
+    const oriData = morBySOID.get(ndoc) || morBySOID.get(norm(invoice_code)) || null;
+    const order_release_id = oriData ? oriData.ori : '';
+
+    // H — Return Status
+    // Matches reference formula:
+    //   =IFNA( XLOOKUP(G, ReturnData.order_id, ReturnData.status),   ← ORI → MRR order_id col (primary)
+    //          XLOOKUP(G, MOR.order_release_id, MOR.status) )         ← fallback: ORI → MOR status
+    // Primary key = order_release_id (G) looked up in MRR's order_id column.
+    // Extra fallbacks kept for robustness: MRR by ORI col, MRR by seller_order_id.
+    let return_status = '';
+    let mrrData = null;
+    mrrData = (order_release_id ? mrrByOrderId.get(order_release_id) : null)  // ← primary: ORI → MRR.order_id
+           || (order_release_id ? mrrByOri.get(order_release_id) : null)      // extra: ORI → MRR.order_release_id col
+           || mrrBySOID.get(ndoc)                                              // extra: seller_order_id
+           || null;
+    // Fallback status: MOR status (= reference's XLOOKUP(G, MOR.order_release_id, MOR.status))
+    return_status = mrrData ? mrrData.status : (oriData ? oriData.status : '');
+
+    // I, J — Bill No & Bill Value (Sales Register, PO = invoice code)
+    // Guard: only lookup when invoice_code is present — blank invoice must stay blank
+    let bill_no = '', bill_value = 0;
+    const ninv = norm(invoice_code);
+    if (ninv) {
+      const srDirect = srByPo.get(ninv);
+      if (srDirect) {
+        bill_no = srDirect.bill_no; bill_value = srDirect.bill_value;
+      } else {
+        const found = lookupContains(srByPo, invoice_code);
+        if (found) { bill_no = found.bill_no; bill_value = found.bill_value; }
+        else {
+          // Debug: log invoice codes that fail SR lookup so you can see the mismatch.
+          // Search for the invoice code in F12 → Console to inspect.
+          console.debug(`[SR MISS] "${invoice_code}" (norm:"${ninv}") not found in SR map.`,
+            'Closest SR keys:', [...srByPo.keys()].filter(k => k.includes(ninv.slice(0,6))).slice(0,4));
+        }
+      }
+    }
+
+    // K, L — SR Number & SR Value
+    // Priority: SRR by PO No → SRR by Bill No → SRR by Invoice → MRR by invoice → MRR by ORI
+    let sr_number = '', sr_value = 0, sr_date_parsed = null;
+    const srrData = srrByPo.get(ninv)                                   // PO Number = invoice_code (same as SR)
+                 || (bill_no ? srrByBillNo.get(norm(bill_no)) : null)   // Bill No match (GST bill)
+                 || srrByInvoice.get(ninv);                              // Invoice code direct match
+    if (srrData) {
+      sr_number = srrData.sr_number; sr_value = srrData.sr_value; sr_date_parsed = srrData.sr_date;
+    } else {
+      const mrrSr = mrrSrByInvoice.get(ninv);
+      if (mrrSr) { sr_number = mrrSr.sr_number; sr_value = mrrSr.sr_value; sr_date_parsed = mrrSr.sr_date; }
+      if (!sr_number && mrrData) { sr_number = mrrData.sr_number; sr_value = mrrData.sr_value; sr_date_parsed = mrrData.sr_date; }
+    }
+
+    // M — Payment (NET): ORI lookup first, SOID fallback.
+    // Reference formula: =XLOOKUP(G2, Sheet7!B:B, Sheet7!C:C)
+    //   G2 = order_release_id (ORI). Sheet7!B = order_release_id. Sheet7!C = Sum of Final (NET).
+    //   → Primary lookup is by ORI (order_release_id).
+    // SOID (UUID = display_order_code) used as fallback when ORI not available.
+    const fwd_payment =
+      (order_release_id && payByOri.has(order_release_id))
+        ? payByOri.get(order_release_id)
+        : (payBySOID.has(ndoc) ? payBySOID.get(ndoc) : 0);
+
+    // N — Payment Difference  (fwd_payment + sr_value – bill_value)
+    const payment_diff = (fwd_payment + sr_value) - bill_value;
+
+    // Aging in days (real dates, not hardcoded 0)
+    const S = daysSince(order_date_parsed);
+    const T = daysSince(mrrData ? mrrData.return_date : null);
+    const ret_delivered_date_parsed = mrrData ? mrrData.return_delivered_date : null;
+    const days_ret_delivered = daysSince(ret_delivered_date_parsed);
+    // U = Days from Ret Delivered (lmdo_last_modified_on) — matches reference formula column U
+    // =IF(AI="","",DAYS(TODAY(),AI)) where AI = lmdo_last_modified_on
+    const U = days_ret_delivered;
+
+    // Period column: MM-YYYY from order date
+    const period = order_date_parsed
+      ? String(order_date_parsed.getMonth() + 1).padStart(2, '0') + '-' + order_date_parsed.getFullYear()
+      : '';
+
+    const status = getReconStatus({
+      H: return_status, E: sales_order_status,
+      I: bill_no, J: bill_value,
+      K: sr_number, L: sr_value,
+      N: fwd_payment,
+      S, T, U
+    });
+
+    out.push({
+      idx, display_order_code, invoice_code, total_price,
+      order_date, order_date_parsed,
+      sales_order_status, facility, shop_group,
+      order_release_id, return_status,
+      bill_no, bill_value,
+      sr_number, sr_value,
+      fwd_payment, payment_diff,
+      days_order: S,
+      days_ret_created: T,
+      days_ret_delivered,
+      period,
+      status
+    });
+    idx++;
+
+    // Yield to browser every CHUNK rows so the tab stays responsive
+    if (_i > 0 && _i % CHUNK === 0) {
+      const pct = Math.round(_i / total * 100);
+      const pb  = document.getElementById('reconProgressBar');
+      const pt  = document.getElementById('reconProgress');
+      if (pb) pb.style.width = pct + '%';
+      if (pt) pt.textContent = `${_i.toLocaleString()} / ${total.toLocaleString()} rows (${pct}%)`;
+      await new Promise(r => setTimeout(r, 0));   // hand control back to browser
+    }
+  }
+
+  // Fill progress bar to 100% before returning
+  const pb = document.getElementById('reconProgressBar');
+  const pt = document.getElementById('reconProgress');
+  if (pb) pb.style.width = '100%';
+  if (pt) pt.textContent = `Finalising ${total.toLocaleString()} rows…`;
+  await new Promise(r => setTimeout(r, 0));
+
+  return out;
+}
+
+// ============================================================
+// STATUS FORMULA — exact replica of reference Excel formula (Summary!V2)
+//
+// Reference formula (V column of Summary sheet, extracted from Excel):
+// =IF(H2="WP","Pending to invoice",
+//  IF(AND(H2="F",J2<>L2),"SR Pending",
+//  IF(H2="F","Canceled",
+//  IF(H2="PK","Pending to Handover",
+//  IF(I2="","Bill Pending",
+//  IF(AND(H2="SH",E2="COMPLETE",S2>5),"Ticket has to raised",
+//  IF(AND(H2="C",N2<(J2*98/100)),"Payment Pending",
+//  IF(AND(OR(H2="Ret Delivered",H2="Delivered",H2="RTO"),K2="Accepted",M2<J2*0.4),"Claim Pending",
+//  IF(K2="Pending","Ticket has to raised",
+//  IF(AND(H2=0,T2>60),"Ticket has to raised",
+//  IF(AND(H2="Dispatched",T2>60),"Ticket has to raised",
+//  IF(AND(H2="Ret Dispatched",T2>60),"Ticket has to raised",
+//  IF(H2=0,"Retun created",         ← TYPO in reference: "Retun" (missing 'r') — matched exactly
+//  IF(H2="Dispatched","RTO Dispatched",
+//  IF(H2="Ret Dispatched","RTV Dispatched",
+//  IF(AND(H2="WP",E2="COMPLETE",S2>5),"Ticket has to raised",  ← DEAD CODE: WP caught at line 1 above
+//  IF(AND(H2="PK",E2="COMPLETE",S2>5),"Ticket has to raised",  ← DEAD CODE: PK caught at line 4 above
+//  IF(AND(H2="RTO Lost",N2<>J2*0.4),"RTO Lost claim pending",
+//  IF(AND(OR(H2="Ret Created",H2="Ret  Created",H2="RTO Created",H2="RTO"),T2>60),"Ticket has to raised",
+//  IF(AND(OR(H2="Ret Created",H2="Ret  Created",H2="RTO Created",H2="RTO"),L2<>J2),"SR To Check",
+//  IF(AND(OR(H2="Ret Delivered",H2="Delivered"),L2<>J2,U2>3),"Ticket Has to raised",
+//  IF(AND(OR(H2="Ret Delivered",H2="Delivered"),L2<>J2),"SR To Check",
+//  "Done"))))))))))))))))))))))
+//
+// Notes:
+//   • Conditions 16 & 17 (WP/PK + COMPLETE + S>5) are DEAD CODE — H="WP" and H="PK" are
+//     already matched and returned at conditions 1 and 4. They can never be reached.
+//   • "Retun created" typo (missing 'r') is reproduced exactly to match reference output.
+//   • M (Claim Amount) is always 0 in our data, so M < J*0.4 is always true when J > 0.
+//
+// Variables:
+//   H = Myntra Order Status (MOR column, mapped via MRR status)
+//   E = Uniware Order Status (Sal/Pur order status)
+//   I = Bill No (GST_BillNo from Sales Register)
+//   J = Bill Value (BillAmt from Sales Register)
+//   K = SR # (SR Number / Credit Note Number from MRR)
+//   L = SR Value (Credit Note Value from MRR)
+//   N = Net Payment received (Sum of Final from Sheet7 via payByOri)
+//   M = Claim Amount (always 0 — not tracked)
+//   S = Days from Order Create (DAYS(TODAY(), order_date))
+//   T = Days from Ret Created  (MRR!AV = DAYS(TODAY(), return_created_date))
+//   U = Days from Ret Delivered (MRR!AW = IF(AI="","",DAYS(TODAY(), lmdo_last_modified_on)))
+// ============================================================
+function getReconStatus({ H, E, I, J, K, L, N, S=0, T=0, U=0 }) {
+  const h = String(H || '').trim();
+  const e = String(E || '').trim().toUpperCase();
+  const i = String(I || '').trim();
+  const j = numVal(J);   // Bill Value
+  const k = String(K || '').trim();  // SR #
+  const l = numVal(L);   // SR Value
+  const n = numVal(N);   // Payment received
+  const m = 0;           // Claim Amount — not computed, always 0
+
+  // 1. H="WP" → Pending to invoice
+  if (h === 'WP') return 'Pending to invoice';
+
+  // 2. H="F" AND J≠L → SR Pending  (bill exists but SR value doesn't match)
+  // 3. H="F"         → Canceled    (bill matches SR or no bill, order effectively cancelled/settled)
+  if (h === 'F' && j !== l) return 'SR Pending';
+  if (h === 'F') return 'Canceled';
+
+  // 4. H="PK" → Pending to Handover
+  if (h === 'PK') return 'Pending to Handover';
+
+  // 5. I="" → Bill Pending  (no bill/invoice generated yet)
+  if (!i) return 'Bill Pending';
+
+  // 6. H="SH" AND E="COMPLETE" AND S>5 → Ticket (shipped but Uniware shows complete after 5 days)
+  if (h === 'SH' && e === 'COMPLETE' && S > 5) return 'Ticket has to raised';
+
+  // 7. H="C" AND N < J*98% → Payment Pending  (completed but payment < 98% of bill)
+  // H="C" in Myntra MOR = Completed/Closed (fulfilled order); not always "Cancelled"
+  if (h === 'C' && n < (j * 0.98)) return 'Payment Pending';
+
+  // 8. Claim Pending — return delivered/RTO AND claim filed (K="Accepted") but low claim amount
+  // M=0 (we don't track claim amount), so M < J*0.4 = 0 < J*0.4 = true whenever J>0
+  if ((h === 'Ret Delivered' || h === 'Delivered' || h === 'RTO') && k === 'Accepted' && m < j * 0.4) return 'Claim Pending';
+
+  // 9. K="Pending" → Ticket has to raised  (SR or claim is still pending)
+  if (k === 'Pending') return 'Ticket has to raised';
+
+  // 10. H=0 (numeric zero / empty) AND T>60 → Ticket
+  if ((h === '0' || h === '') && T > 60) return 'Ticket has to raised';
+
+  // 11-12. H="Dispatched"/"Ret Dispatched" AND T>60 → Ticket
+  if (h === 'Dispatched' && T > 60) return 'Ticket has to raised';
+  if (h === 'Ret Dispatched' && T > 60) return 'Ticket has to raised';
+
+  // 13. H=0 (numeric zero / empty) → "Retun created"
+  // NOTE: Reference Excel formula has a TYPO — "Retun created" (missing 'r') — matched exactly here
+  if (h === '0' || h === '') return 'Retun created';
+
+  // 14-15. Dispatch statuses
+  if (h === 'Dispatched') return 'RTO Dispatched';
+  if (h === 'Ret Dispatched') return 'RTV Dispatched';
+
+  // 16. H="L" (Lost in MOR) — extra safety, not in reference formula
+  if (h === 'L') return 'Lost - Claim Pending';
+
+  // 17. H="RTO Lost" AND N≠J*0.4 → RTO Lost claim pending
+  if (h === 'RTO Lost' && n !== j * 0.4) return 'RTO Lost claim pending';
+
+  // 18. Return created statuses with time check (T>60 = ticket)
+  // Note: "Ret  Created" with TWO SPACES is an exact variant in reference formula
+  if ((h === 'Ret Created' || h === 'Ret  Created' || h === 'RTO Created' || h === 'RTO') && T > 60) return 'Ticket has to raised';
+
+  // 19. Return created statuses with SR mismatch (L≠J)
+  if ((h === 'Ret Created' || h === 'Ret  Created' || h === 'RTO Created' || h === 'RTO') && l !== j) return 'SR To Check';
+
+  // 20-21. Return delivered with SR mismatch
+  if ((h === 'Ret Delivered' || h === 'Delivered') && l !== j && U > 3) return 'Ticket Has to raised';
+  if ((h === 'Ret Delivered' || h === 'Delivered') && l !== j) return 'SR To Check';
+
+  // 22. Catch-all
+  return 'Done';
+}
+
+// ============================================================
+// FILTERING, SORTING, RENDERING
+// ============================================================
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  applyFilters();
+}
+
+function applyFilters() {
+  const search  = norm(document.getElementById('searchInput').value);
+  const statusF = document.getElementById('statusFilter').value;
+  const fromVal = document.getElementById('dateFrom').value;
+  const toVal   = document.getElementById('dateTo').value;
+  const dateFrom = fromVal ? new Date(fromVal) : null;
+  const dateTo   = toVal   ? new Date(toVal + 'T23:59:59') : null;
+
+  filteredData = reconData.filter(r => {
+    if (search && ![r.display_order_code, r.invoice_code, r.status, r.return_status, r.bill_no, r.order_release_id]
+      .some(v => norm(v).includes(search))) return false;
+    if (statusF && r.status !== statusF) return false;
+    if (dateFrom && (!r.order_date_parsed || r.order_date_parsed < dateFrom)) return false;
+    if (dateTo   && (!r.order_date_parsed || r.order_date_parsed > dateTo))   return false;
+    return true;
+  });
+
+  if (sortKey) {
+    filteredData.sort((a, b) => {
+      // Sort date column by the parsed Date, not the display string
+      if (sortKey === 'order_date') {
+        const av = a.order_date_parsed ? a.order_date_parsed.getTime() : 0;
+        const bv = b.order_date_parsed ? b.order_date_parsed.getTime() : 0;
+        return (av - bv) * sortDir;
+      }
+      let av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'number') return (av - bv) * sortDir;
+      return String(av||'').localeCompare(String(bv||'')) * sortDir;
+    });
+  }
+
+  currentPage = 1;
+  renderPage();
+  updateStats();
+}
+
+// ============================================================
+// SIDEBAR TOGGLE
+// ============================================================
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const btn     = document.getElementById('sidebarToggle');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '›' : '☰';
+  btn.title       = collapsed ? 'Open sidebar' : 'Close sidebar';
+  btn.style.transform = collapsed ? 'none' : 'none';
+}
+
+// ============================================================
+// SORT INDICATORS — highlight active column header
+// ============================================================
+function updateSortIndicators() {
+  document.querySelectorAll('thead th[data-key]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.key === sortKey) {
+      th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortDir = -sortDir;
+  else { sortKey = key; sortDir = 1; }
+  updateSortIndicators();
+  applyFilters();
+}
+
+function changePageSize() {
+  pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+  currentPage = 1;
+  renderPage();
+}
+
+function renderPage() {
+  const start = (currentPage - 1) * pageSize;
+  const end   = Math.min(start + pageSize, filteredData.length);
+  const rows  = filteredData.slice(start, end);
+
+  document.getElementById('reconBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.idx}</td>
+      <td title="${esc(r.display_order_code)}">${esc(r.display_order_code)}</td>
+      <td title="${esc(r.invoice_code)}">${esc(r.invoice_code)}</td>
+      <td class="num">${fmt(r.total_price)}</td>
+      <td>${esc(r.order_date)}</td>
+      <td>${esc(r.sales_order_status)}</td>
+      <td>${esc(r.facility)}</td>
+      <td title="${esc(r.order_release_id)}">${esc(r.order_release_id)}</td>
+      <td>${esc(r.return_status)}</td>
+      <td title="${esc(r.bill_no)}">${esc(r.bill_no)}</td>
+      <td class="num">${fmt(r.bill_value)}</td>
+      <td title="${esc(r.sr_number)}">${esc(r.sr_number)}</td>
+      <td class="num">${fmt(r.sr_value)}</td>
+      <td class="num">${fmt(r.fwd_payment)}</td>
+      <td class="num ${r.payment_diff > 0 ? 'diff-pos' : r.payment_diff < 0 ? 'diff-neg' : 'diff-zero'}">${fmt(r.payment_diff)}</td>
+      <td class="num">${r.days_order || 0}</td>
+      <td class="num">${r.days_ret_created || 0}</td>
+      <td class="num">${r.days_ret_delivered || 0}</td>
+      <td>${esc(r.period)}</td>
+      <td>${badgeHtml(r.status)}</td>
+    </tr>
+  `).join('');
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  document.getElementById('pageInfo').textContent = `Showing ${start+1}–${end} of ${filteredData.length}`;
+
+  let btns = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  pageRange(currentPage, totalPages).forEach(p => {
+    if (p === '…') btns += `<button class="page-btn" disabled>…</button>`;
+    else btns += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+  });
+  btns += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>›</button>`;
+  document.getElementById('pageBtns').innerHTML = btns;
+}
+
+function goPage(p) {
+  const total = Math.ceil(filteredData.length / pageSize);
+  if (p < 1 || p > total) return;
+  currentPage = p;
+  renderPage();
+}
+
+function pageRange(cur, total) {
+  if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+  const r = [1];
+  if (cur > 3) r.push('…');
+  for (let i=Math.max(2,cur-1); i<=Math.min(total-1,cur+1); i++) r.push(i);
+  if (cur < total-2) r.push('…');
+  r.push(total);
+  return r;
+}
+
+function updateStats() {
+  const data = filteredData;
+  const isFiltered = reconData.length > 0 && data.length !== reconData.length;
+  document.getElementById('statTotal').textContent = isFiltered
+    ? `${data.length} / ${reconData.length}` : data.length;
+  document.getElementById('statTotalLbl').textContent = isFiltered ? 'Filtered / Total' : 'Total Orders';
+  document.getElementById('statDone').textContent    = data.filter(r => r.status === 'Done').length;
+  document.getElementById('statTicket').textContent  = data.filter(r => r.status && r.status.includes('Ticket')).length;
+  document.getElementById('statPending').textContent = data.filter(r => r.status && r.status.includes('Pending')).length;
+  const totalBill = data.reduce((s,r) => s + r.bill_value, 0);
+  const totalPay  = data.reduce((s,r) => s + r.fwd_payment, 0);
+  const totalDiff = data.reduce((s,r) => s + r.payment_diff, 0);
+  document.getElementById('statBillVal').textContent  = '₹' + fmtLarge(totalBill);
+  document.getElementById('statPayment').textContent  = '₹' + fmtLarge(totalPay);
+  const diffEl = document.getElementById('statDiff');
+  diffEl.textContent  = '₹' + fmtLarge(totalDiff);
+  diffEl.className    = 'val ' + (totalDiff > 0 ? 'green' : totalDiff < 0 ? 'red' : '');
+}
+
+function populateStatusFilter() {
+  const statuses = [...new Set(reconData.map(r => r.status).filter(Boolean))].sort();
+  document.getElementById('statusFilter').innerHTML =
+    '<option value="">All Statuses</option>' +
+    statuses.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+}
+
+// ============================================================
+// EXPORT — always exports the current filtered view
+// ============================================================
+function exportExcel() {
+  const data = filteredData.length ? filteredData : reconData;
+  if (!data.length) return;
+  const headers = [
+    'Display Order Code', 'Invoice Code', 'Total Price', 'Order Date',
+    'Sale Order Status', 'Facility', 'Myntra order #', 'Myntra Order Status',
+    'Bill No', 'Bill Value', 'SR #', 'SR Value', 'Claim Amount',
+    'Fwd Payment received', 'Payment difference', 'Escalation Comments',
+    'Remark', 'Claim %', 'Days from Order Create', 'Days from Ret Created',
+    'Days from Ret Delivered', 'Status', 'D'
+  ];
+  const rows = data.map(r => [
+    r.display_order_code, r.invoice_code, r.total_price, r.order_date,
+    r.sales_order_status, r.facility, r.order_release_id, r.return_status,
+    r.bill_no, r.bill_value, r.sr_number, r.sr_value, '',
+    r.fwd_payment, r.payment_diff, '', '', '',
+    r.days_order || 0, r.days_ret_created || 0, r.days_ret_delivered || 0,
+    r.status, r.period
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [20,18,12,14,16,14,16,18,18,12,14,12,12,16,16,18,14,10,16,16,16,20,10].map(w=>({wch:w}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Recon');
+  XLSX.writeFile(wb, 'Myntra_Recon_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  showToast(`✓ Exported ${data.length} rows`, 'success');
+}
+
+// ============================================================
+// RESET
+// ============================================================
+function resetAll() {
+  Object.keys(sheets).forEach(k => { sheets[k] = []; loadedFlags[k] = false; });
+  reconData = []; filteredData = [];
+  ['uni','sr','srr','mor','mrr','pay'].forEach(k => {
+    document.getElementById('card-' + k).classList.remove('loaded');
+    document.getElementById('status-' + k).textContent = '⬜';
+    document.getElementById('files-' + k).textContent = '';
+    document.getElementById('file-' + k).value = '';
+  });
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressText').textContent = '0 of 6 sheets loaded';
+  document.getElementById('headerMeta').textContent = '0 / 6 sheets loaded';
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('exportBtn').disabled = true;
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('reconTable').style.display = 'none';
+  document.getElementById('pagination').style.display = 'none';
+  document.getElementById('statusFilter').innerHTML = '<option value="">All Statuses</option>';
+  document.getElementById('statTotal').textContent = '0';
+  document.getElementById('statTotalLbl').textContent = 'Total Orders';
+  document.getElementById('statDone').textContent = '0';
+  document.getElementById('statTicket').textContent = '0';
+  document.getElementById('statPending').textContent = '0';
+  document.getElementById('statBillVal').textContent = '₹0';
+  document.getElementById('statPayment').textContent = '₹0';
+  document.getElementById('statDiff').textContent = '₹0';
+  clearFilters();
+  showToast('Reset complete');
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(n) { if (!n && n !== 0) return ''; return Number(n).toLocaleString('en-IN', {maximumFractionDigits:2, minimumFractionDigits:2}); }
+function fmtLarge(n) { return Math.abs(n) >= 1e7 ? (n/1e7).toFixed(2)+'Cr' : Math.abs(n) >= 1e5 ? (n/1e5).toFixed(2)+'L' : Number(n).toLocaleString('en-IN',{maximumFractionDigits:0}); }
+
+function badgeHtml(status) {
+  if (!status) return '';
+  let cls = 'badge-gray';
+  const s = status.toLowerCase();
+  if (s === 'done') cls = 'badge-done';
+  else if (s.includes('ticket') || s.includes('lost')) cls = 'badge-ticket';
+  else if (s.includes('pending')) cls = 'badge-pending';
+  else if (s.includes('claim')) cls = 'badge-claim';
+  else if (s.includes('check') || s.includes('sr')) cls = 'badge-info';
+  return `<span class="badge ${cls}">${esc(status)}</span>`;
+}
+
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
