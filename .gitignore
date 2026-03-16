@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+~$*
+*.docx
+.claude/
+1234.py
+generate_docs.py
+app.py
