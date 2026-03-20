@@ -201,6 +201,33 @@ SHEET_LABELS = {
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
+def read_uploaded_file(f):
+    """
+    Reads an uploaded file (Excel or CSV) into a DataFrame.
+    Handles CSVs that have metadata/report header rows at the top
+    (e.g. exports from Tally, SAP) by auto-detecting the real header row
+    as the row with the most non-empty fields.
+    """
+    name = f.name.lower()
+    if name.endswith(".csv"):
+        # Read everything without a header first
+        try:
+            raw = pd.read_csv(f, header=None, on_bad_lines='skip', dtype=str, encoding='utf-8')
+        except UnicodeDecodeError:
+            f.seek(0)
+            raw = pd.read_csv(f, header=None, on_bad_lines='skip', dtype=str, encoding='latin-1')
+        # Find the row with the most filled cells — that's the real header
+        filled = raw.apply(lambda r: r.notna().sum(), axis=1)
+        header_idx = int(filled.idxmax())
+        df = raw.iloc[header_idx + 1:].copy()
+        df.columns = raw.iloc[header_idx].values
+        df = df.reset_index(drop=True)
+        # Drop completely empty rows
+        df = df.dropna(how='all')
+        return df
+    else:
+        return pd.read_excel(f, engine="openpyxl")
+
 def norm(s):
     return re.sub(r'[\s_\-\/\.]+', '', str(s or '').strip().lower())
 
@@ -1265,8 +1292,7 @@ with st.sidebar:
                             all_rows = []
                             col_warn  = None
                             for f in files:
-                                df_raw = (pd.read_csv(f) if f.name.endswith(".csv")
-                                          else pd.read_excel(f, engine="openpyxl"))
+                                df_raw = read_uploaded_file(f)
                                 # For mrr: detect order_release_id early and warn if missing
                                 if key == "mrr" and col_warn is None:
                                     _cm = detect_cols(df_raw, SHEET_COL_CANDIDATES["mrr"])
