@@ -210,12 +210,22 @@ def read_uploaded_file(f):
     """
     name = f.name.lower()
     if name.endswith(".csv"):
-        # Read everything without a header first
+        # Read raw bytes and detect encoding
+        raw_bytes = f.read()
         try:
-            raw = pd.read_csv(f, header=None, on_bad_lines='skip', dtype=str, encoding='utf-8')
-        except UnicodeDecodeError:
-            f.seek(0)
-            raw = pd.read_csv(f, header=None, on_bad_lines='skip', dtype=str, encoding='latin-1')
+            content = raw_bytes.decode('utf-8') if isinstance(raw_bytes, bytes) else raw_bytes
+        except (UnicodeDecodeError, AttributeError):
+            content = raw_bytes.decode('latin-1') if isinstance(raw_bytes, bytes) else raw_bytes
+        # Detect max columns using csv module so metadata rows with fewer
+        # fields don't cause pandas to silently drop wider data rows
+        import csv as _csv
+        lines = content.splitlines()
+        reader = _csv.reader(lines)
+        max_cols = max(len(row) for row in reader)
+        raw = pd.read_csv(
+            io.StringIO(content), header=None, names=range(max_cols),
+            dtype=str, on_bad_lines='skip',
+        )
         # Find the row with the most filled cells — that's the real header
         filled = raw.apply(lambda r: r.notna().sum(), axis=1)
         header_idx = int(filled.idxmax())
