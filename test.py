@@ -159,7 +159,7 @@ SHEET_COL_CANDIDATES = {
                               "Return State","Return Tracking Status","Shipment Status"],
     },
     "sr": {
-        "po_number":  ["PO Number","PONumber","po_number","PONO","PO No","PO","Buyer PO","Order No","Order Number","Order Reference","Ref No","Reference No","Document No"],
+        "po_number":  ["PO Number","PO No.","PONumber","po_number","PONO","PO No","PO","Buyer PO","Order No","Order Number","Order Reference","Ref No","Reference No","Document No"],
         "bill_no":    ["GST_BillNo","GST Bill No","GST BillNo","GST Bill Number","Bill No","Bill Number","BillNo","Invoice No","Invoice Number","Invoice","Bill"],
         "bill_date":  ["Bill Date","Bill Dt.","Bill Dt","BillDate","bill_date","Invoice Date","InvoiceDate","Date"],
         "bill_value": ["Bill Value","Bill Amount","BillValue","Bill Amt","BillAmt","bill_amt","Taxable Value","Invoice Value","Invoice Amount","Amount","Net Amount","Total Amount"],
